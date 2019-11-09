@@ -181,11 +181,11 @@ cat <<EOF >${dir}/start.sh
 #!/bin/bash
 /usr/bin/ss-server -c /etc/shadowsocks-libev/config.json & # ss server
 ${dir}/kcptun.s  -l ":${kcptunport}" -t "127.0.0.1:${ssport}" -mode fast2 -mtu 1300 &
-${dir}/udp2raw.s -s  -l0.0.0.0:${ssudp2rawport} -r 127.0.0.1:${kcptunport} -k \"${udp2rawpwd}\" --raw-mode faketcp -a &
+${dir}/udp2raw.s -s  -l0.0.0.0:${ssudp2rawport} -r 127.0.0.1:${kcptunport} -k \"${udp2rawpwd}\" --raw-mode faketcp &
 
 openvpn --config /etc/openvpn/ovpn.conf & # openvpn server
 ${dir}/speeder.s -s -l0.0.0.0:${speederport} -r127.0.0.1:${ovpnport}  -f20:10 -k \"${udpspeederpwd}\" --mode 0 &
-${dir}/udp2raw.s -s  -l0.0.0.0:${ovpnudp2rawport} -r 127.0.0.1:${speederport} -k \"${udp2rawpwd}\" --raw-mode faketcp -a
+${dir}/udp2raw.s -s  -l0.0.0.0:${ovpnudp2rawport} -r 127.0.0.1:${speederport} -k \"${udp2rawpwd}\" --raw-mode faketcp
 EOF
 chmod +x ${dir}/start.sh
 
@@ -272,7 +272,7 @@ echo These are yours password:
 echo shadowsocks: $sspwd udpspeeder: $udpspeederpwd udp2raw: $udp2rawpwd
 echo 
 echo Run udp2raw and kcptun for shadowsocks:
-echo udp2raw_client -c -r${myip}:${ssudp2rawport} -l0.0.0.0:4000 --raw-mode faketcp -a -k"${udp2rawpwd}"
+echo udp2raw_client -c -r${myip}:${ssudp2rawport} -l0.0.0.0:4000 --raw-mode faketcp -k\"${udp2rawpwd}\"
 echo kcptun_client -r "127.0.0.1:4000" -l ":3322" -mode fast2 -mtu 1300
 echo 
 echo Then, run shadowsocks connect to 127.0.0.1:3322.
@@ -280,8 +280,8 @@ echo
 echo
 echo
 echo Run udp2raw and udpspeeder for openvpn:
-echo udp2raw_client -c -r${myip}:${ovpnudp2rawport} -l0.0.0.0:4001 --raw-mode faketcp -a -k"${udp2rawpwd}"
-echo udpspeederv2_client -c -l0.0.0.0:3333  -r127.0.0.1:4001 -f20:10 -k "${udpspeederpwd}"
+echo udp2raw_client -c -r${myip}:${ovpnudp2rawport} -l0.0.0.0:4001 --raw-mode faketcp -k\"${udp2rawpwd}\"
+echo udpspeederv2_client -c -l0.0.0.0:3333  -r127.0.0.1:4001 -f20:10 -k \"${udpspeederpwd}\"
 echo
 echo Then, run openvpn connect to 127.0.0.1:3333.
 echo The "share.ovpn" is openvpn config file, Please download it to your local machine.
