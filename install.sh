@@ -1,6 +1,6 @@
 #!/bin/bash
 
-trap "rm -rf tmp EasyRSA pki" EXIT
+trap "rm -rf tmp EasyRSA EasyRSA.tgz pki" EXIT
 
 speeder_ver='20190121.0'
 kcptun_ver='20191107'
