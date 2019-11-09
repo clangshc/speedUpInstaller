@@ -1,22 +1,18 @@
 #!/bin/bash
 
-if [ -z '$(cat /etc/*release | grep -i Ubuntu)' ]; then
-    echo 'Just support ubuntu.'
-    exit 1
-fi
-
 trap "rm -rf tmp EasyRSA pki" EXIT
 
 speeder_ver='20190121.0'
 kcptun_ver='20191107'
 udp2raw_ver='20181113.0'
 dir='/usr/local/myspeeder'
+myetc='/etc/myspeeder'
 
 myip=$(curl ifconfig.me)
 
 ssport=6605
-ssudp2rawport=6607
-ovpnudp2rawport=6610
+kcp_udp2rawport=6607
+ovpn_udp2rawport=6610
 
 
 kcptunport=45535
@@ -24,29 +20,37 @@ ovpnport=45536
 speederport=45537
 
 
-sspwd=$(cat /dev/urandom | head -n 10 | md5sum | head -c 10)
-udp2rawpwd=$(cat /dev/urandom | head -n 10 | md5sum | head -c 10)
-udpspeederpwd=$(cat /dev/urandom | head -n 10 | md5sum | head -c 10)
+# sspwd=$(cat /dev/urandom | head -n 10 | md5sum | head -c 10)
+# udp2rawpwd=$(cat /dev/urandom | head -n 10 | md5sum | head -c 10)
+# udpspeederpwd=$(cat /dev/urandom | head -n 10 | md5sum | head -c 10)
+sspwd=1139c0ec00
+udp2rawpwd=e1af606c85
+udpspeederpwd=e1af606c85
 
 rm -rf $dir 2>/dev/null
 mkdir $dir
 
+rm -rf $myetc 2>/dev/null
+mkdir $myetc
+
 systemctl stop myspeeder 2>/dev/null
 
 # enable bbr, make sure your kernel version is greater than 4.9.
-echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
-echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
-sysctl -p
-sysctl net.ipv4.tcp_available_congestion_control
-sysctl net.ipv4.tcp_congestion_control
+if [ -z '$(lsmod | grep bbr)' ]; then
+    echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
+    echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
+    sysctl -p
+    sysctl net.ipv4.tcp_available_congestion_control
+    sysctl net.ipv4.tcp_congestion_control
+fi
+
 
 # install ss and openvpn
 apt -y update
 apt -y install curl shadowsocks-libev openvpn
 
 # install ss
-rm -rf /etc/shadowsocks-libev/config.json 2>/dev/null
-cat <<EOF > /etc/shadowsocks-libev/config.json
+cat <<EOF > $myetc/sserver.json
 {
     "server":"0.0.0.0",
     "server_port":${ssport},
@@ -56,7 +60,6 @@ cat <<EOF > /etc/shadowsocks-libev/config.json
 }
 EOF
 # Start the service
-systemctl enable shadowsocks-libev
 
 # install kcptun
 curl -kLs https://github.com/xtaci/kcptun/releases/download/v${kcptun_ver}/kcptun-linux-amd64-${kcptun_ver}.tar.gz > kcptun.tar.gz
@@ -66,6 +69,7 @@ cp ./kcptun/server_linux_amd64 $dir/kcptun.s
 chmod +x $dir/kcptun.s
 rm -rf kcptun 2>/dev/null
 rm -rf kcptun.tar.gz 2>/dev/null
+
 
 # install udpspeeder
 curl -kLs https://github.com/wangyu-/UDPspeeder/releases/download/${speeder_ver}/speederv2_binaries.tar.gz > speeder.tar.gz
@@ -85,13 +89,9 @@ chmod +x $dir/udp2raw.s
 rm -rf udp2raw 2>/dev/null
 rm -rf udp2raw.tar.gz 2>/dev/null
 
-
-
 curl -kLs wget -P ~/ https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.4/EasyRSA-3.0.4.tgz > EasyRSA.tgz
-
 tar xvf EasyRSA.tgz
 mv EasyRSA-3.0.4 EasyRSA
-
 cp EasyRSA/vars.example EasyRSA/vars
 echo 'set_var EASYRSA_REQ_COUNTRY    "US"' >> EasyRSA/vars
 echo 'set_var EASYRSA_REQ_PROVINCE   "NewYork"' >> EasyRSA/vars
@@ -131,7 +131,7 @@ cp pki/private/myclient.key tmp
 cp pki/issued/myclient.crt tmp
 cp pki/ca.crt tmp
 
-cat <<EOF >/etc/openvpn/ovpn.conf
+cat <<EOF > $myetc/ovpn.conf
 local 0.0.0.0
 port ${ovpnport}
 proto udp
@@ -179,21 +179,20 @@ EOF
 rm -rf ${dir}/start.sh 2>/dev/null
 cat <<EOF >${dir}/start.sh
 #!/bin/bash
-/usr/bin/ss-server -c /etc/shadowsocks-libev/config.json & # ss server
-${dir}/kcptun.s  -l ":${kcptunport}" -t "127.0.0.1:${ssport}" -mode fast2 -mtu 1300 &
-${dir}/udp2raw.s -s  -l0.0.0.0:${ssudp2rawport} -r 127.0.0.1:${kcptunport} -k \"${udp2rawpwd}\" --raw-mode faketcp -a &
+/usr/bin/ss-server -c $myetc/sserver.json &
+${dir}/kcptun.s -t "127.0.0.1:${ssport}" -l ":${kcptunport}" -mode fast3 -nocomp -sockbuf 16777217 -dscp 46 &
+${dir}/udp2raw.s -s -l0.0.0.0:${kcp_udp2rawport} -r127.0.0.1:${kcptunport} -k${udp2rawpwd} --raw-mode faketcp -a &
 
-openvpn --config /etc/openvpn/ovpn.conf & # openvpn server
-${dir}/speeder.s -s -l0.0.0.0:${speederport} -r127.0.0.1:${ovpnport}  -f20:10 -k \"${udpspeederpwd}\" --mode 0 &
-${dir}/udp2raw.s -s  -l0.0.0.0:${ovpnudp2rawport} -r 127.0.0.1:${speederport} -k \"${udp2rawpwd}\" --raw-mode faketcp -a
+openvpn --config $myetc/ovpn.conf &
+${dir}/speeder.s -s -l0.0.0.0:${speederport} -r127.0.0.1:${ovpnport}  -f20:10 -k${udpspeederpwd} --mode 0 &
+${dir}/udp2raw.s -s -l0.0.0.0:${ovpn_udp2rawport} -r 127.0.0.1:${speederport} -k${udp2rawpwd} --raw-mode faketcp -a
 EOF
 chmod +x ${dir}/start.sh
 
 rm -rf ${dir}/stop.sh 2>/dev/null
 cat <<EOF > ${dir}/stop.sh
 #!/bin/bash
-systemctl stop shadowsocks-libev
-ps xf | grep -v grep | grep "kcptun.s|speeder.s|udp2raw.s|openvpn|shadowsocks-libev" | while read pid _; do kill -9 "\$pid"; done
+ps -efl | grep -v grep | grep -E "myspeeder|openvpn|ss-server" | while read pid _; do kill -9 "\$pid"; done
 EOF
 chmod +x ${dir}/stop.sh
 
@@ -206,6 +205,7 @@ Description=MySpeeder
 [Service]
 ExecStart=${dir}/start.sh
 ExecStop=${dir}/stop.sh
+User=root
 
 [Install]
 WantedBy=multi-user.target
@@ -272,7 +272,7 @@ echo These are yours password:
 echo shadowsocks: $sspwd udpspeeder: $udpspeederpwd udp2raw: $udp2rawpwd
 echo 
 echo Run udp2raw and kcptun for shadowsocks:
-echo udp2raw_client -c -r${myip}:${ssudp2rawport} -l0.0.0.0:4000 --raw-mode faketcp -k\"${udp2rawpwd}\" -a
+echo udp2raw_client -c -r${myip}:${ssudp2rawport} -l0.0.0.0:4000 --raw-mode faketcp -k${udp2rawpwd} -a
 echo kcptun_client -r "127.0.0.1:4000" -l ":3322" -mode fast2 -mtu 1300
 echo 
 echo Then, run shadowsocks connect to 127.0.0.1:3322.
@@ -280,8 +280,8 @@ echo
 echo
 echo
 echo Run udp2raw and udpspeeder for openvpn:
-echo udp2raw_client -c -r${myip}:${ovpnudp2rawport} -l0.0.0.0:4001 --raw-mode faketcp -k\"${udp2rawpwd}\" -a
-echo udpspeederv2_client -c -l0.0.0.0:3333  -r127.0.0.1:4001 -f20:10 -k \"${udpspeederpwd}\"
+echo udp2raw_client -c -r${myip}:${ovpnudp2rawport} -l0.0.0.0:4001 --raw-mode faketcp -k${udp2rawpwd} -a
+echo udpspeederv2_client -c -l0.0.0.0:3333  -r127.0.0.1:4001 -f20:10 -k${udpspeederpwd}
 echo
 echo Then, run openvpn connect to 127.0.0.1:3333.
 echo The "share.ovpn" is openvpn config file, Please download it to your local machine.

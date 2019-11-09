@@ -8,5 +8,6 @@ apt remove openvpn shadowsocks-libev
 rm -rf /usr/local/myspeeder 2>/dev/null
 rm -rf /etc/shadowsocks-libev 2>/dev/null
 rm -rf /etc/openvpn/ 2>/dev/null
+rm -rf /etc/myspeeder/ 2>/dev/null
 
 echo Uninstall success.
