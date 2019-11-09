@@ -12,6 +12,11 @@ After install, you have three choice to connect your proxy server:
 
     sudo sh -c "$(curl -fsSL https://raw.githubusercontent.com/daoye/speedUpInstaller/master/install.sh)"
 
+# Start and Stop
+
+    systemctl start myspeeder
+    systemctl stop myspeeder
+
 # Uninstall
 
     sudo sh -c "$(curl -fsSL https://raw.githubusercontent.com/daoye/speedUpInstaller/master/uninstall.sh)"
