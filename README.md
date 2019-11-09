@@ -10,11 +10,11 @@ After install, you have three choice to connect your proxy server:
 
 # Install
 
-curl -L https://raw.githubusercontent.com/daoye/speedUpInstaller/master/install.sh | sudo sh
+    sudo sh -c "$(curl -fsSL https://raw.githubusercontent.com/daoye/speedUpInstaller/master/install.sh)"
 
 # Uninstall
 
-curl -L https://raw.githubusercontent.com/daoye/speedUpInstaller/master/uninstall.sh | sudo sh
+    sudo sh -c "$(curl -fsSL https://raw.githubusercontent.com/daoye/speedUpInstaller/master/uninstall.sh)"
 
 # Remark
 
