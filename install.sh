@@ -20,12 +20,12 @@ ovpnport=45536
 speederport=45537
 
 
-# sspwd=$(cat /dev/urandom | head -n 10 | md5sum | head -c 10)
-# udp2rawpwd=$(cat /dev/urandom | head -n 10 | md5sum | head -c 10)
-# udpspeederpwd=$(cat /dev/urandom | head -n 10 | md5sum | head -c 10)
-sspwd=1139c0ec00
-udp2rawpwd=e1af606c85
-udpspeederpwd=e1af606c85
+sspwd=$(cat /dev/urandom | head -n 10 | md5sum | head -c 10)
+udp2rawpwd=$(cat /dev/urandom | head -n 10 | md5sum | head -c 10)
+udpspeederpwd=$(cat /dev/urandom | head -n 10 | md5sum | head -c 10)
+# sspwd=1139c0ec00
+# udp2rawpwd=e1af606c85
+# udpspeederpwd=e1af606c85
 
 rm -rf $dir 2>/dev/null
 mkdir $dir
@@ -180,7 +180,7 @@ rm -rf ${dir}/start.sh 2>/dev/null
 cat <<EOF >${dir}/start.sh
 #!/bin/bash
 /usr/bin/ss-server -c $myetc/sserver.json &
-${dir}/kcptun.s -t "127.0.0.1:${ssport}" -l ":${kcptunport}" -mode fast3 -nocomp -sockbuf 16777217 -dscp 46 &
+${dir}/kcptun.s -t "127.0.0.1:${ssport}" -l ":${kcptunport}" -mode fast3 -mtu 1300 &
 ${dir}/udp2raw.s -s -l0.0.0.0:${kcp_udp2rawport} -r127.0.0.1:${kcptunport} -k${udp2rawpwd} --raw-mode faketcp -a &
 
 openvpn --config $myetc/ovpn.conf &
